@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PorterDuff
@@ -16,6 +17,7 @@ import android.text.TextPaint
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.os.SystemClock
 import com.example.scratchoff.R
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -24,6 +26,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlin.math.sin
 import kotlin.random.Random
 
 class ArcadeScratchGameView @JvmOverloads constructor(
@@ -45,6 +48,13 @@ class ArcadeScratchGameView @JvmOverloads constructor(
         SCRATCH,
         LEFT_LIST,
         RIGHT_LIST,
+    }
+
+    private enum class BorderAnim {
+        NONE,
+        PULSE,
+        STRIP_HORIZONTAL,
+        STRIP_VERTICAL,
     }
 
     private data class SymbolSpec(
@@ -127,6 +137,20 @@ class ArcadeScratchGameView @JvmOverloads constructor(
     private val itemTitleSize get() = sp(12f)
     private val bodyTextSize get() = sp(9f)
     private val detailTextSize get() = sp(8.2f)
+
+    private val neonCyan = Color.rgb(86, 243, 255)
+    private val neonBlue = Color.rgb(78, 132, 255)
+    private val neonPink = Color.rgb(255, 82, 214)
+    private val neonLime = Color.rgb(111, 255, 193)
+    private val neonAmber = Color.rgb(255, 198, 92)
+    private val neonPurple = Color.rgb(154, 92, 255)
+    private val neonOrange = Color.rgb(255, 138, 64)
+    private val inkBlack = Color.rgb(6, 8, 20)
+    private val panelInk = Color.rgb(12, 18, 34)
+    private val panelMid = Color.rgb(20, 27, 48)
+    private val panelViolet = Color.rgb(21, 17, 44)
+    private val boardShadow = Color.rgb(10, 11, 24)
+    private val gridLine = Color.argb(34, 86, 243, 255)
 
     private val tickets = listOf(
         TicketDefinition(
@@ -274,6 +298,11 @@ class ArcadeScratchGameView @JvmOverloads constructor(
 
     private var scratchBitmap: Bitmap? = null
     private var scratchCanvas: Canvas? = null
+    private var pulsePhase = 0f
+    private var neonPulseRunning = false
+    private var pulseStartTimeMs = 0L
+    private val pulseDurationMs = 1650L
+    private val titleFlowDurationMs = 3200L
 
     init {
         isFocusable = true
@@ -287,8 +316,23 @@ class ArcadeScratchGameView @JvmOverloads constructor(
         rebuildScratchLayer()
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (pulseStartTimeMs == 0L) {
+            pulseStartTimeMs = SystemClock.uptimeMillis()
+        }
+        neonPulseRunning = true
+        postInvalidateOnAnimation()
+    }
+
+    override fun onDetachedFromWindow() {
+        neonPulseRunning = false
+        super.onDetachedFromWindow()
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        updatePulsePhase()
         drawBackground(canvas)
         drawTopHud(canvas)
         drawLeftPanel(canvas)
@@ -297,6 +341,9 @@ class ArcadeScratchGameView @JvmOverloads constructor(
         drawTicketActionArea(canvas)
         drawInfoPanel(canvas)
         drawRightPanel(canvas)
+        if (neonPulseRunning) {
+            postInvalidateOnAnimation()
+        }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -621,26 +668,103 @@ class ArcadeScratchGameView @JvmOverloads constructor(
             0f,
             width.toFloat(),
             height.toFloat(),
-            Color.rgb(18, 20, 30),
-            Color.rgb(34, 38, 55),
+            Color.rgb(3, 5, 16),
+            Color.rgb(15, 12, 36),
             Shader.TileMode.CLAMP,
         )
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
         bgPaint.shader = null
 
-        fillPaint.color = Color.argb(24, 255, 255, 255)
-        val step = dp(20f)
+        fillPaint.color = Color.argb(34, Color.red(neonBlue), Color.green(neonBlue), Color.blue(neonBlue))
+        canvas.drawCircle(width * 0.16f, height * 0.18f, width * 0.20f, fillPaint)
+        fillPaint.color = Color.argb(26, Color.red(neonPink), Color.green(neonPink), Color.blue(neonPink))
+        canvas.drawCircle(width * 0.84f, height * 0.22f, width * 0.16f, fillPaint)
+        fillPaint.color = Color.argb(22, Color.red(neonCyan), Color.green(neonCyan), Color.blue(neonCyan))
+        canvas.drawCircle(width * 0.62f, height * 0.86f, width * 0.22f, fillPaint)
+        fillPaint.color = Color.argb(24, Color.red(neonAmber), Color.green(neonAmber), Color.blue(neonAmber))
+        canvas.drawCircle(width * 0.46f, height * 0.09f, width * 0.11f, fillPaint)
+        fillPaint.color = Color.argb(20, Color.red(neonLime), Color.green(neonLime), Color.blue(neonLime))
+        canvas.drawCircle(width * 0.12f, height * 0.76f, width * 0.12f, fillPaint)
+        fillPaint.color = Color.argb(18, Color.red(neonPurple), Color.green(neonPurple), Color.blue(neonPurple))
+        canvas.drawCircle(width * 0.91f, height * 0.72f, width * 0.12f, fillPaint)
+        fillPaint.color = Color.argb(20, Color.red(neonOrange), Color.green(neonOrange), Color.blue(neonOrange))
+        canvas.drawCircle(width * 0.29f, height * 0.54f, width * 0.10f, fillPaint)
+        fillPaint.color = Color.argb(18, Color.red(neonBlue), Color.green(neonBlue), Color.blue(neonBlue))
+        canvas.drawCircle(width * 0.72f, height * 0.52f, width * 0.09f, fillPaint)
+
+        fillPaint.shader = LinearGradient(
+            0f,
+            height * 0.18f,
+            width * 0.46f,
+            height * 0.66f,
+            intArrayOf(Color.argb(34, 86, 243, 255), Color.argb(0, 86, 243, 255)),
+            floatArrayOf(0f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawRect(0f, height * 0.08f, width * 0.48f, height * 0.82f, fillPaint)
+        fillPaint.shader = LinearGradient(
+            width.toFloat(),
+            height * 0.12f,
+            width * 0.54f,
+            height * 0.74f,
+            intArrayOf(Color.argb(30, 255, 82, 214), Color.argb(0, 255, 82, 214)),
+            floatArrayOf(0f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawRect(width * 0.52f, height * 0.04f, width.toFloat(), height * 0.88f, fillPaint)
+        fillPaint.shader = LinearGradient(
+            width * 0.30f,
+            0f,
+            width * 0.76f,
+            height.toFloat(),
+            intArrayOf(Color.argb(18, 255, 198, 92), Color.argb(0, 111, 255, 193)),
+            floatArrayOf(0f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawRect(width * 0.22f, 0f, width * 0.82f, height.toFloat(), fillPaint)
+        fillPaint.shader = null
+
+        val step = dp(26f)
         var x = 0f
         while (x < width) {
+            fillPaint.color = when ((x / step).toInt() % 5) {
+                0 -> Color.argb(34, 255, 82, 214)
+                1 -> Color.argb(30, 86, 243, 255)
+                2 -> Color.argb(24, 255, 198, 92)
+                else -> gridLine
+            }
             canvas.drawRect(x, 0f, x + dp(1f), height.toFloat(), fillPaint)
             x += step
+        }
+        var y = 0f
+        while (y < height) {
+            fillPaint.color = if (((y / step).toInt() % 4) == 0) Color.argb(18, 111, 255, 193) else Color.argb(26, 86, 243, 255)
+            canvas.drawRect(0f, y, width.toFloat(), y + dp(1f), fillPaint)
+            y += step
         }
     }
 
     private fun drawTopHud(canvas: Canvas) {
-        drawPanel(canvas, topHudRect, Color.rgb(29, 39, 59), Color.rgb(91, 172, 226))
-        drawText(canvas, text(R.string.game_hud_title), topHudRect.left + dp(18f), topHudRect.top + dp(33f), sectionTitleSize, Color.WHITE, true)
-        drawText(canvas, text(R.string.game_level_format, playerLevel()), topHudRect.right - dp(78f), topHudRect.top + dp(33f), sectionTitleSize, Color.rgb(255, 210, 82), true)
+        drawPanel(canvas, topHudRect, panelMid, neonCyan, anim = BorderAnim.PULSE, phaseOffset = 0.08f)
+        val titleBaseline = topHudRect.top + dp(46f)
+        val levelText = text(R.string.game_level_format, playerLevel())
+        drawFlowGradientText(
+            canvas,
+            "\u522e\uff01",
+            topHudRect.left + dp(16f),
+            titleBaseline,
+            sp(29f),
+            true,
+        )
+        drawText(
+            canvas,
+            levelText,
+            topHudRect.right - dp(18f) - measureTextWidth(levelText, sectionTitleSize, true),
+            titleBaseline,
+            sectionTitleSize,
+            neonAmber,
+            true,
+        )
 
         val barRect = RectF(
             topHudRect.left + dp(16f),
@@ -648,16 +772,16 @@ class ArcadeScratchGameView @JvmOverloads constructor(
             topHudRect.right - dp(16f),
             topHudRect.bottom - dp(10f),
         )
-        drawText(canvas, text(R.string.game_cash_format, formatMoney(cash)), topHudRect.left + dp(18f), barRect.top - dp(8f), bodyTextSize, Color.rgb(195, 204, 214), false)
-        drawPanel(canvas, barRect, Color.rgb(12, 18, 30), Color.rgb(60, 98, 136))
+        drawText(canvas, text(R.string.game_cash_format, formatMoney(cash)), topHudRect.left + dp(18f), barRect.top - dp(8f), bodyTextSize, neonCyan, false)
+        drawPanel(canvas, barRect, inkBlack, neonBlue, gloss = false, anim = BorderAnim.STRIP_HORIZONTAL, phaseOffset = 0.18f)
         val progress = (careerWealth.toFloat() / targetWealth.toFloat()).coerceIn(0f, 1f)
         fillPaint.shader = LinearGradient(
             barRect.left,
             barRect.top,
             barRect.right,
             barRect.bottom,
-            Color.rgb(255, 184, 78),
-            Color.rgb(95, 215, 170),
+            intArrayOf(neonOrange, neonPink, neonCyan, neonLime),
+            floatArrayOf(0f, 0.34f, 0.68f, 1f),
             Shader.TileMode.CLAMP,
         )
         canvas.drawRoundRect(
@@ -670,18 +794,18 @@ class ArcadeScratchGameView @JvmOverloads constructor(
         drawText(canvas, "${formatMoney(careerWealth)} / ${formatMoney(targetWealth)}", barRect.left + dp(44f), barRect.top + dp(15f), itemTitleSize, Color.WHITE, true)
 
         val helpRect = RectF(width - dp(76f), dp(16f), width - dp(16f), dp(76f))
-        drawPanel(canvas, helpRect, Color.rgb(34, 53, 78), Color.rgb(103, 184, 232))
+        drawPanel(canvas, helpRect, panelViolet, neonPurple, anim = BorderAnim.STRIP_VERTICAL, phaseOffset = 0.36f)
         drawCenteredText(canvas, "?", helpRect, sp(28f), Color.WHITE, true)
     }
 
     private fun drawLeftPanel(canvas: Canvas) {
-        drawPanel(canvas, leftPanelRect, Color.rgb(20, 30, 48), Color.rgb(57, 110, 164))
+        drawPanel(canvas, leftPanelRect, panelInk, neonBlue, gloss = false, anim = BorderAnim.STRIP_VERTICAL, phaseOffset = 0.14f)
 
         val tabHeight = dp(34f)
         val tab1 = RectF(leftPanelRect.left, leftPanelRect.top, leftPanelRect.left + leftPanelRect.width() * 0.48f, leftPanelRect.top + tabHeight)
         val tab2 = RectF(tab1.right + dp(6f), leftPanelRect.top, leftPanelRect.right, leftPanelRect.top + tabHeight)
-        drawPanel(canvas, tab1, Color.rgb(49, 145, 182), Color.rgb(103, 209, 239))
-        drawPanel(canvas, tab2, Color.rgb(44, 53, 67), Color.rgb(78, 90, 108))
+        drawPanel(canvas, tab1, Color.rgb(14, 71, 92), neonCyan, anim = BorderAnim.STRIP_HORIZONTAL, phaseOffset = 0.04f)
+        drawPanel(canvas, tab2, Color.rgb(24, 28, 52), neonPurple, anim = BorderAnim.PULSE, phaseOffset = 0.22f)
         drawCenteredText(canvas, text(R.string.game_tab_album), tab1, sectionTitleSize, Color.WHITE, true)
         drawCenteredText(canvas, text(R.string.game_tab_rules), tab2, sectionTitleSize, Color.WHITE, true)
 
@@ -701,24 +825,51 @@ class ArcadeScratchGameView @JvmOverloads constructor(
                 val unlocked = isTicketUnlocked(index)
                 val selected = index == currentTicketIndex
                 val rowColor = when {
-                    selected -> Color.rgb(47, 81, 135)
-                    unlocked -> Color.rgb(34, 49, 74)
-                    else -> Color.rgb(22, 30, 44)
+                    selected -> Color.rgb(22, 53, 88)
+                    unlocked -> Color.rgb(18, 28, 52)
+                    else -> Color.rgb(12, 16, 30)
                 }
-                drawPanel(canvas, row, rowColor, Color.rgb(74, 121, 184))
+                val rowStroke = when {
+                    selected -> neonCyan
+                    unlocked && index % 3 == 0 -> neonBlue
+                    unlocked && index % 3 == 1 -> neonPurple
+                    unlocked -> neonLime
+                    else -> neonAmber
+                }
+                drawPanel(
+                    canvas,
+                    row,
+                    rowColor,
+                    rowStroke,
+                    anim = when {
+                        selected -> BorderAnim.STRIP_HORIZONTAL
+                        unlocked -> BorderAnim.PULSE
+                        else -> BorderAnim.NONE
+                    },
+                    phaseOffset = (index * 0.13f) % 1f,
+                )
                 drawMiniIcon(canvas, row.left + dp(30f), row.centerY(), ticket.frameColor, ticket.accentColor, unlocked)
                 drawText(canvas, text(ticket.titleRes), row.left + dp(60f), row.top + row.height() * 0.30f, itemTitleSize, Color.WHITE, true)
                 drawText(canvas, text(ticket.subtitleRes), row.left + dp(60f), row.top + row.height() * 0.50f, bodyTextSize, Color.rgb(180, 197, 216), false)
 
                 if (unlocked) {
                     val progress = ticketLevelProgress(index)
-                    drawText(canvas, "S${formatMoney(ticket.cost)}", row.left + dp(60f), row.top + row.height() * 0.70f, bodyTextSize, if (ticket.cost >= 2_000) Color.rgb(234, 91, 74) else Color.WHITE, false)
-                    drawText(canvas, text(R.string.game_level_format, ticketProgress[index].level), row.left + dp(116f), row.top + row.height() * 0.70f, bodyTextSize, Color.rgb(194, 201, 212), false)
+                    drawText(canvas, "S${formatMoney(ticket.cost)}", row.left + dp(60f), row.top + row.height() * 0.70f, bodyTextSize, if (ticket.cost >= 2_000) neonPink else neonAmber, false)
+                    drawText(canvas, text(R.string.game_level_format, ticketProgress[index].level), row.left + dp(116f), row.top + row.height() * 0.70f, bodyTextSize, neonCyan, false)
                     val barRect = RectF(row.left + dp(60f), row.bottom - dp(12f), row.right - dp(12f), row.bottom - dp(6f))
-                    fillPaint.color = Color.rgb(31, 74, 36)
+                    fillPaint.color = Color.rgb(14, 33, 44)
                     canvas.drawRoundRect(barRect, dp(6f), dp(6f), fillPaint)
-                    fillPaint.color = Color.rgb(73, 214, 52)
+                    fillPaint.shader = LinearGradient(
+                        barRect.left,
+                        barRect.top,
+                        barRect.right,
+                        barRect.bottom,
+                        intArrayOf(neonBlue, neonCyan, neonLime),
+                        floatArrayOf(0f, 0.52f, 1f),
+                        Shader.TileMode.CLAMP,
+                    )
                     canvas.drawRoundRect(RectF(barRect.left, barRect.top, barRect.left + barRect.width() * progress, barRect.bottom), dp(6f), dp(6f), fillPaint)
+                    fillPaint.shader = null
                 } else {
                     drawWrappedText(
                         canvas,
@@ -728,7 +879,7 @@ class ArcadeScratchGameView @JvmOverloads constructor(
                         row.width() - dp(72f),
                         dp(12f),
                         bodyTextSize,
-                        Color.rgb(160, 170, 184),
+                        Color.rgb(175, 163, 208),
                         false,
                         2,
                     )
@@ -736,68 +887,145 @@ class ArcadeScratchGameView @JvmOverloads constructor(
                 y += rowHeight + gap
             }
         }
-        drawScrollBar(canvas, contentRect, leftMaxScroll, leftScrollOffset)
     }
 
     private fun drawCenterBoard(canvas: Canvas) {
+        val boardPulse = pulse(0.18f, 1f)
         fillPaint.shader = LinearGradient(
             centerBoardRect.left,
             centerBoardRect.top,
             centerBoardRect.right,
             centerBoardRect.bottom,
-            Color.rgb(87, 66, 52),
-            Color.rgb(59, 45, 37),
+            Color.rgb(9, 12, 28),
+            Color.rgb(24, 16, 52),
             Shader.TileMode.CLAMP,
         )
         canvas.drawRoundRect(centerBoardRect, dp(24f), dp(24f), fillPaint)
         fillPaint.shader = null
-        strokePaint.color = Color.rgb(160, 124, 88)
-        strokePaint.strokeWidth = dp(2f)
+        strokePaint.color = neonCyan
+        strokePaint.strokeWidth = dp(2.2f)
+        canvas.drawRoundRect(centerBoardRect, dp(24f), dp(24f), strokePaint)
+        strokePaint.color = withAlpha(neonBlue, (92f + 82f * boardPulse).toInt())
+        strokePaint.strokeWidth = dp(4.8f + boardPulse * 1.2f)
+        canvas.drawRoundRect(centerBoardRect, dp(24f), dp(24f), strokePaint)
+        strokePaint.color = withAlpha(neonPurple, (36f + 42f * pulse(0.1f, 1f, 0.41f)).toInt())
+        strokePaint.strokeWidth = dp(7.2f + boardPulse * 1.4f)
         canvas.drawRoundRect(centerBoardRect, dp(24f), dp(24f), strokePaint)
 
-        fillPaint.color = Color.argb(68, 163, 122, 84)
-        canvas.drawRoundRect(
-            RectF(
-                centerBoardRect.left + dp(20f),
-                centerBoardRect.top + dp(14f),
-                centerBoardRect.right - dp(20f),
-                centerBoardRect.bottom - dp(20f),
-            ),
-            dp(20f),
-            dp(20f),
-            fillPaint,
+        val inner = RectF(
+            centerBoardRect.left + dp(20f),
+            centerBoardRect.top + dp(14f),
+            centerBoardRect.right - dp(20f),
+            centerBoardRect.bottom - dp(20f),
         )
+        fillPaint.color = Color.argb(84, 6, 10, 24)
+        canvas.drawRoundRect(inner, dp(20f), dp(20f), fillPaint)
+        var x = inner.left + dp(10f)
+        while (x < inner.right) {
+            fillPaint.color = when ((x / dp(24f)).toInt() % 4) {
+                0 -> Color.argb(18, 86, 243, 255)
+                1 -> Color.argb(16, 154, 92, 255)
+                2 -> Color.argb(14, 111, 255, 193)
+                else -> Color.argb(14, 255, 138, 64)
+            }
+            canvas.drawRect(x, inner.top, x + dp(1f), inner.bottom, fillPaint)
+            x += dp(24f)
+        }
+        var y = inner.top + dp(10f)
+        while (y < inner.bottom) {
+            fillPaint.color = when ((y / dp(24f)).toInt() % 4) {
+                0 -> Color.argb(18, 154, 92, 255)
+                1 -> Color.argb(16, 255, 82, 214)
+                2 -> Color.argb(14, 86, 243, 255)
+                else -> Color.argb(14, 255, 198, 92)
+            }
+            canvas.drawRect(inner.left, y, inner.right, y + dp(1f), fillPaint)
+            y += dp(24f)
+        }
+        fillPaint.color = withAlpha(neonCyan, (22f + 44f * boardPulse).toInt())
+        canvas.drawCircle(inner.centerX(), inner.top + inner.height() * 0.18f, inner.width() * (0.22f + 0.018f * boardPulse), fillPaint)
+        fillPaint.color = withAlpha(neonPurple, (22f + 34f * pulse(0.12f, 1f, 0.32f)).toInt())
+        canvas.drawCircle(inner.centerX(), inner.bottom - inner.height() * 0.12f, inner.width() * (0.26f + 0.02f * boardPulse), fillPaint)
+        fillPaint.color = withAlpha(neonLime, (14f + 24f * pulse(0.12f, 1f, 0.58f)).toInt())
+        canvas.drawCircle(inner.left + inner.width() * 0.16f, inner.centerY(), inner.width() * 0.10f, fillPaint)
+        fillPaint.color = withAlpha(neonOrange, (12f + 20f * pulse(0.12f, 1f, 0.74f)).toInt())
+        canvas.drawCircle(inner.right - inner.width() * 0.14f, inner.centerY(), inner.width() * 0.09f, fillPaint)
     }
 
     private fun drawTicket(canvas: Canvas) {
         val ticket = tickets[currentTicketIndex]
         val titleSize = sectionTitleSize
         val subtitleSize = bodyTextSize
+        val ticketPulse = pulse(0.10f, 1f, 0.12f)
         canvas.save()
         canvas.rotate(-2.2f, ticketRect.centerX(), ticketRect.centerY())
 
         fillPaint.color = Color.argb(90, 0, 0, 0)
         canvas.drawRoundRect(RectF(ticketRect.left + dp(10f), ticketRect.top + dp(12f), ticketRect.right + dp(10f), ticketRect.bottom + dp(12f)), dp(20f), dp(20f), fillPaint)
-        fillPaint.shader = LinearGradient(ticketRect.left, ticketRect.top, ticketRect.right, ticketRect.bottom, ticket.frameColor, darken(ticket.frameColor, 0.82f), Shader.TileMode.CLAMP)
+        fillPaint.shader = LinearGradient(
+            ticketRect.left,
+            ticketRect.top,
+            ticketRect.right,
+            ticketRect.bottom,
+            Color.rgb(28, 16, 48),
+            Color.rgb(9, 10, 24),
+            Shader.TileMode.CLAMP,
+        )
         canvas.drawRoundRect(ticketRect, dp(20f), dp(20f), fillPaint)
         fillPaint.shader = null
-        drawDither(canvas, ticketRect, Color.argb(20, 255, 255, 255), dp(10f))
+        strokePaint.color = withAlpha(neonPink, (182f + 44f * ticketPulse).toInt())
+        strokePaint.strokeWidth = dp(2.8f + ticketPulse * 0.7f)
+        canvas.drawRoundRect(ticketRect, dp(20f), dp(20f), strokePaint)
+        strokePaint.color = withAlpha(neonPink, (78f + 92f * ticketPulse).toInt())
+        strokePaint.strokeWidth = dp(5.6f + ticketPulse * 1.4f)
+        canvas.drawRoundRect(ticketRect, dp(20f), dp(20f), strokePaint)
+        drawDither(canvas, ticketRect, Color.argb(26, Color.red(neonPink), Color.green(neonPink), Color.blue(neonPink)), dp(10f))
+        fillPaint.color = withAlpha(neonPink, (22f + 30f * ticketPulse).toInt())
+        canvas.drawRoundRect(
+            RectF(
+                ticketRect.left + ticketRect.width() * 0.06f,
+                ticketRect.top + ticketRect.height() * 0.06f,
+                ticketRect.right - ticketRect.width() * 0.06f,
+                ticketRect.top + ticketRect.height() * 0.18f,
+            ),
+            dp(16f),
+            dp(16f),
+            fillPaint,
+        )
+        fillPaint.color = withAlpha(neonPink, (14f + 26f * ticketPulse).toInt())
+        canvas.drawRoundRect(
+            RectF(
+                ticketRect.left - dp(4f),
+                ticketRect.top - dp(4f),
+                ticketRect.right + dp(4f),
+                ticketRect.bottom + dp(4f),
+            ),
+            dp(24f),
+            dp(24f),
+            fillPaint,
+        )
 
-        drawText(canvas, text(R.string.game_ticket_header), ticketRect.left + ticketRect.width() * 0.10f, ticketRect.top + ticketRect.height() * 0.20f, titleSize, Color.rgb(61, 46, 34), true)
-        drawText(canvas, text(ticket.subtitleRes), ticketRect.left + ticketRect.width() * 0.10f, ticketRect.top + ticketRect.height() * 0.28f, subtitleSize, Color.rgb(82, 64, 50), false)
+        drawText(canvas, text(R.string.game_ticket_header), ticketRect.left + ticketRect.width() * 0.10f, ticketRect.top + ticketRect.height() * 0.20f, titleSize, neonPink, true)
+        drawText(canvas, text(ticket.subtitleRes), ticketRect.left + ticketRect.width() * 0.10f, ticketRect.top + ticketRect.height() * 0.28f, subtitleSize, Color.rgb(215, 189, 255), false)
         if (ticket.mode == TicketMode.QUICK_BONUS) {
-            drawText(canvas, text(R.string.game_bonus_slot), ticketRect.right - ticketRect.width() * 0.25f, ticketRect.top + ticketRect.height() * 0.33f, itemTitleSize, ticket.accentColor, true)
+            drawText(canvas, text(R.string.game_bonus_slot), ticketRect.right - ticketRect.width() * 0.25f, ticketRect.top + ticketRect.height() * 0.33f, itemTitleSize, neonAmber, true)
         }
 
-        fillPaint.color = Color.argb(68, 18, 18, 18)
+        fillPaint.color = Color.argb(96, 3, 7, 18)
         canvas.drawRoundRect(scratchRect, dp(10f), dp(10f), fillPaint)
+        strokePaint.color = neonBlue
+        strokePaint.strokeWidth = dp(1.8f)
+        canvas.drawRoundRect(scratchRect, dp(10f), dp(10f), strokePaint)
         drawScratchContent(canvas)
         scratchBitmap?.let { canvas.drawBitmap(it, scratchRect.left, scratchRect.top, overlayPaint) }
 
         if (ticket.mode == TicketMode.QUICK_BONUS) {
-            fillPaint.color = if (currentSession.bonusActive) Color.rgb(247, 199, 75) else Color.argb(90, 68, 58, 48)
+        fillPaint.color = if (currentSession.bonusActive) neonAmber else Color.argb(90, 31, 19, 46)
             canvas.drawRoundRect(bonusRect, dp(12f), dp(12f), fillPaint)
-            drawStar(canvas, bonusRect.centerX(), bonusRect.centerY(), min(bonusRect.width(), bonusRect.height()) * 0.24f, if (currentSession.bonusActive) Color.rgb(255, 240, 130) else ticket.accentColor)
+            strokePaint.color = if (currentSession.bonusActive) neonPink else ticket.accentColor
+            strokePaint.strokeWidth = dp(2f)
+            canvas.drawRoundRect(bonusRect, dp(12f), dp(12f), strokePaint)
+            drawStar(canvas, bonusRect.centerX(), bonusRect.centerY(), min(bonusRect.width(), bonusRect.height()) * 0.24f, if (currentSession.bonusActive) neonPink else ticket.accentColor)
         }
 
         canvas.restore()
@@ -806,11 +1034,14 @@ class ArcadeScratchGameView @JvmOverloads constructor(
     private fun drawScratchContent(canvas: Canvas) {
         val ticket = tickets[currentTicketIndex]
         slotRects.forEachIndexed { index, rect ->
-            fillPaint.color = Color.rgb(205, 219, 225)
+            fillPaint.color = Color.rgb(20, 30, 56)
             canvas.drawRoundRect(rect, dp(8f), dp(8f), fillPaint)
-            fillPaint.shader = LinearGradient(rect.left, rect.top, rect.right, rect.bottom, Color.argb(35, 255, 255, 255), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+            fillPaint.shader = LinearGradient(rect.left, rect.top, rect.right, rect.bottom, Color.argb(34, 255, 82, 214), Color.argb(18, 86, 243, 255), Shader.TileMode.CLAMP)
             canvas.drawRoundRect(rect, dp(8f), dp(8f), fillPaint)
             fillPaint.shader = null
+            strokePaint.color = Color.argb(140, Color.red(neonCyan), Color.green(neonCyan), Color.blue(neonCyan))
+            strokePaint.strokeWidth = dp(1.5f)
+            canvas.drawRoundRect(rect, dp(8f), dp(8f), strokePaint)
 
             if (index < currentSession.slots.size) {
                 val symbol = ticket.symbols.first { it.id == currentSession.slots[index] }
@@ -821,12 +1052,25 @@ class ArcadeScratchGameView @JvmOverloads constructor(
 
     private fun drawTicketActionArea(canvas: Canvas) {
         val ticket = tickets[currentTicketIndex]
-        drawPanel(canvas, statusRect, Color.argb(224, 40, 45, 56), Color.rgb(105, 149, 196))
+        val actionPulse = pulse(0.08f, 1f, 0.22f)
+        drawPanel(canvas, statusRect, Color.argb(232, 17, 24, 42), neonOrange, anim = BorderAnim.PULSE, phaseOffset = 0.42f)
         drawPanel(
             canvas,
             actionRect,
-            if (ticketSettled) Color.rgb(58, 156, 108) else Color.rgb(49, 59, 74),
-            if (ticketSettled) Color.rgb(110, 233, 171) else Color.rgb(89, 112, 140),
+            if (ticketSettled) Color.rgb(18, 56, 44) else Color.rgb(43, 15, 57),
+            if (ticketSettled) neonLime else neonPink,
+            anim = BorderAnim.STRIP_HORIZONTAL,
+            phaseOffset = 0.54f,
+        )
+        strokePaint.color = if (ticketSettled) withAlpha(neonLime, (86f + 102f * actionPulse).toInt()) else withAlpha(neonPink, (92f + 108f * actionPulse).toInt())
+        strokePaint.strokeWidth = dp(4.2f + actionPulse * 1.2f)
+        canvas.drawRoundRect(actionRect, dp(18f), dp(18f), strokePaint)
+        fillPaint.color = if (ticketSettled) withAlpha(neonLime, (10f + 24f * actionPulse).toInt()) else withAlpha(neonPink, (12f + 28f * actionPulse).toInt())
+        canvas.drawRoundRect(
+            RectF(actionRect.left - dp(2f), actionRect.top - dp(2f), actionRect.right + dp(2f), actionRect.bottom + dp(2f)),
+            dp(20f),
+            dp(20f),
+            fillPaint,
         )
 
         drawCenteredTextFit(
@@ -835,7 +1079,7 @@ class ArcadeScratchGameView @JvmOverloads constructor(
             statusRect.insetCopy(dp(8f), dp(6f)),
             itemTitleSize,
             bodyTextSize,
-            Color.rgb(255, 224, 120),
+            neonOrange,
             true,
         )
 
@@ -853,7 +1097,7 @@ class ArcadeScratchGameView @JvmOverloads constructor(
         val weights = normalizedWeights(ticket)
         val nextLevel = nextTicketLevelExp(progress.level)
 
-        drawPanel(canvas, infoRect, Color.argb(224, 28, 37, 53), Color.rgb(76, 144, 189), gloss = false)
+        drawPanel(canvas, infoRect, Color.argb(228, 11, 18, 34), neonBlue, gloss = false, anim = BorderAnim.STRIP_VERTICAL, phaseOffset = 0.28f)
         val contentRect = infoRect.insetCopy(dp(10f), dp(10f))
         clipped(canvas, contentRect) {
             val symbolHeaderRect = RectF(contentRect.left, contentRect.top + dp(80f), contentRect.left + contentRect.width() * 0.36f, contentRect.top + dp(96f))
@@ -861,15 +1105,15 @@ class ArcadeScratchGameView @JvmOverloads constructor(
             val payoutHeaderRect = RectF(contentRect.left + contentRect.width() * 0.64f, contentRect.top + dp(80f), contentRect.right, contentRect.top + dp(96f))
 
             drawText(canvas, text(ticket.titleRes), contentRect.left, contentRect.top + dp(17f), sectionTitleSize, Color.WHITE, true)
-            drawText(canvas, text(ticket.subtitleRes), contentRect.left, contentRect.top + dp(31f), bodyTextSize, Color.rgb(176, 201, 220), false)
-            drawWrappedText(canvas, text(ticket.ruleTextRes), contentRect.left, contentRect.top + dp(45f), contentRect.width(), dp(11f), bodyTextSize, Color.rgb(214, 223, 233), false, 2)
+            drawText(canvas, text(ticket.subtitleRes), contentRect.left, contentRect.top + dp(31f), bodyTextSize, Color.rgb(197, 172, 255), false)
+            drawWrappedText(canvas, text(ticket.ruleTextRes), contentRect.left, contentRect.top + dp(45f), contentRect.width(), dp(11f), bodyTextSize, Color.rgb(215, 226, 245), false, 2)
 
-            drawText(canvas, text(R.string.game_card_level_format, progress.level), contentRect.left, contentRect.top + dp(69f), itemTitleSize, Color.rgb(255, 220, 128), true)
-            drawText(canvas, text(R.string.game_exp_format, progress.exp, nextLevel), contentRect.left + contentRect.width() * 0.44f, contentRect.top + dp(69f), bodyTextSize, Color.rgb(196, 203, 214), false)
+            drawText(canvas, text(R.string.game_card_level_format, progress.level), contentRect.left, contentRect.top + dp(69f), itemTitleSize, neonAmber, true)
+            drawText(canvas, text(R.string.game_exp_format, progress.exp, nextLevel), contentRect.left + contentRect.width() * 0.44f, contentRect.top + dp(69f), bodyTextSize, neonCyan, false)
 
-            drawCenteredTextFit(canvas, text(R.string.game_symbol_header), symbolHeaderRect, itemTitleSize, bodyTextSize, Color.rgb(152, 214, 235), true)
-            drawCenteredTextFit(canvas, text(R.string.game_odds_header), oddsHeaderRect, itemTitleSize, bodyTextSize, Color.rgb(152, 214, 235), true)
-            drawCenteredTextFit(canvas, text(R.string.game_amount_header), payoutHeaderRect, itemTitleSize, bodyTextSize, Color.rgb(152, 214, 235), true)
+            drawCenteredTextFit(canvas, text(R.string.game_symbol_header), symbolHeaderRect, itemTitleSize, bodyTextSize, neonCyan, true)
+            drawCenteredTextFit(canvas, text(R.string.game_odds_header), oddsHeaderRect, itemTitleSize, bodyTextSize, neonPurple, true)
+            drawCenteredTextFit(canvas, text(R.string.game_amount_header), payoutHeaderRect, itemTitleSize, bodyTextSize, neonOrange, true)
 
             val tableTop = contentRect.top + dp(100f)
             val gap = dp(6f)
@@ -881,17 +1125,20 @@ class ArcadeScratchGameView @JvmOverloads constructor(
                 val payoutRect = RectF(row.left + row.width() * 0.62f, row.top, row.right - dp(4f), row.bottom)
                 fillPaint.color = Color.argb(34, 255, 255, 255)
                 canvas.drawRoundRect(row, dp(10f), dp(10f), fillPaint)
+                strokePaint.color = Color.argb(90, Color.red(neonBlue), Color.green(neonBlue), Color.blue(neonBlue))
+                strokePaint.strokeWidth = dp(1.2f)
+                canvas.drawRoundRect(row, dp(10f), dp(10f), strokePaint)
                 drawSymbolToken(canvas, symbol, row.left + dp(13f), row.centerY(), dp(6.8f))
                 drawText(canvas, symbol.label, row.left + dp(25f), row.centerY() + dp(3f), bodyTextSize, Color.WHITE, true)
-                drawCenteredTextFit(canvas, "${formatPercent(weights[index])}%", oddsRect, bodyTextSize, detailTextSize, Color.WHITE, false)
-                drawCenteredTextFit(canvas, formatMoney(symbol.payout), payoutRect, bodyTextSize, detailTextSize, Color.WHITE, false)
+                drawCenteredTextFit(canvas, "${formatPercent(weights[index])}%", oddsRect, bodyTextSize, detailTextSize, Color.rgb(224, 212, 255), false)
+                drawCenteredTextFit(canvas, formatMoney(symbol.payout), payoutRect, bodyTextSize, detailTextSize, Color.rgb(255, 221, 182), false)
                 y += rowHeight + gap
             }
         }
     }
 
     private fun drawRightPanel(canvas: Canvas) {
-        drawPanel(canvas, rightPanelRect, Color.rgb(21, 54, 72), Color.rgb(73, 172, 205), gloss = false)
+        drawPanel(canvas, rightPanelRect, Color.argb(228, 11, 18, 34), neonLime, gloss = false, anim = BorderAnim.STRIP_VERTICAL, phaseOffset = 0.63f)
         drawCenteredText(canvas, text(R.string.game_upgrade_title), RectF(rightPanelRect.left, rightPanelRect.top + dp(6f), rightPanelRect.right, rightPanelRect.top + dp(40f)), sectionTitleSize, Color.WHITE, true)
 
         upgradeRows.clear()
@@ -908,18 +1155,28 @@ class ArcadeScratchGameView @JvmOverloads constructor(
                 val row = RectF(contentRect.left, y, contentRect.right, y + rowHeight)
                 val levelRect = RectF(row.right - dp(46f), row.bottom - dp(22f), row.right - dp(10f), row.bottom - dp(8f))
                 upgradeRows += index to row
-                drawPanel(canvas, row, Color.rgb(28, 76, 96), Color.rgb(82, 178, 205))
+                drawPanel(
+                    canvas,
+                    row,
+                    Color.rgb(15, 28, 52),
+                    when (index) {
+                        0 -> neonLime
+                        1 -> neonCyan
+                        else -> neonAmber
+                    },
+                    anim = if (index % 2 == 0) BorderAnim.STRIP_HORIZONTAL else BorderAnim.PULSE,
+                    phaseOffset = 0.17f * (index + 1),
+                )
                 drawUpgradeIcon(canvas, index, row.left + dp(21f), row.centerY())
                 drawText(canvas, text(upgrade.titleRes), row.left + dp(42f), row.top + dp(17f), itemTitleSize, Color.WHITE, true)
                 drawWrappedText(canvas, text(upgrade.effectTextRes), row.left + dp(42f), row.top + dp(31f), row.width() - dp(88f), dp(9f), detailTextSize, Color.rgb(194, 208, 217), false, 2)
-                drawText(canvas, text(R.string.game_upgrade_cost_format, formatMoney(upgradeCost(index))), row.left + dp(42f), row.bottom - dp(11f), bodyTextSize, Color.rgb(236, 91, 71), false)
-                fillPaint.color = Color.argb(58, 255, 255, 255)
+                drawText(canvas, text(R.string.game_upgrade_cost_format, formatMoney(upgradeCost(index))), row.left + dp(42f), row.bottom - dp(11f), bodyTextSize, neonAmber, false)
+                fillPaint.color = Color.argb(46, 255, 255, 255)
                 canvas.drawRoundRect(levelRect, dp(8f), dp(8f), fillPaint)
-                drawCenteredTextFit(canvas, text(R.string.game_level_format, upgrade.level), levelRect, bodyTextSize, detailTextSize, Color.rgb(220, 232, 239), true)
+                drawCenteredTextFit(canvas, text(R.string.game_level_format, upgrade.level), levelRect, bodyTextSize, detailTextSize, neonCyan, true)
                 y += rowHeight + gap
             }
         }
-        drawScrollBar(canvas, contentRect, rightMaxScroll, rightScrollOffset)
     }
 
     private fun prepareTicket(resetCost: Boolean) {
@@ -1127,20 +1384,20 @@ class ArcadeScratchGameView @JvmOverloads constructor(
         val canvas = scratchCanvas ?: return
         canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
         val layerRect = RectF(0f, 0f, bitmap.width.toFloat(), bitmap.height.toFloat())
-        fillPaint.color = Color.rgb(160, 168, 176)
+        fillPaint.color = Color.rgb(39, 47, 73)
         canvas.drawRoundRect(layerRect, dp(10f), dp(10f), fillPaint)
         fillPaint.shader = LinearGradient(
             0f,
             0f,
             bitmap.width.toFloat(),
             bitmap.height.toFloat(),
-            Color.rgb(212, 218, 224),
-            Color.rgb(116, 124, 132),
+            Color.rgb(102, 116, 150),
+            Color.rgb(37, 44, 72),
             Shader.TileMode.CLAMP,
         )
         canvas.drawRoundRect(layerRect, dp(10f), dp(10f), fillPaint)
         fillPaint.shader = null
-        fillPaint.color = Color.argb(210, 236, 240, 242)
+        fillPaint.color = Color.argb(140, 86, 243, 255)
         var x = -bitmap.height.toFloat()
         while (x < bitmap.width + bitmap.height) {
             canvas.drawLine(x, 0f, x + bitmap.height, bitmap.height.toFloat(), fillPaint)
@@ -1152,8 +1409,8 @@ class ArcadeScratchGameView @JvmOverloads constructor(
             0f,
             0f,
             bitmap.height * 0.42f,
-            Color.argb(150, 255, 255, 255),
-            Color.argb(18, 255, 255, 255),
+            Color.argb(130, 255, 255, 255),
+            Color.argb(16, 255, 255, 255),
             Shader.TileMode.CLAMP,
         )
         canvas.drawRoundRect(
@@ -1171,7 +1428,7 @@ class ArcadeScratchGameView @JvmOverloads constructor(
             bitmap.height * 0.82f,
         )
         val overlaySize = min(sp(18f), min(bitmap.width * 0.14f, bitmap.height * 0.32f))
-        drawCenteredTextFit(canvas, text(R.string.game_scratch_here), overlayRect, overlaySize, max(sp(9f), overlaySize * 0.58f), Color.WHITE, true)
+        drawCenteredTextFit(canvas, text(R.string.game_scratch_here), overlayRect, overlaySize, max(sp(9f), overlaySize * 0.58f), neonCyan, true)
     }
 
     private fun scratchAt(x: Float, y: Float) {
@@ -1211,18 +1468,89 @@ class ArcadeScratchGameView @JvmOverloads constructor(
         scratchProgress = 1f
     }
 
-    private fun drawPanel(canvas: Canvas, rect: RectF, fill: Int, stroke: Int, gloss: Boolean = true) {
-        fillPaint.color = Color.argb(72, 0, 0, 0)
+    private fun drawPanel(
+        canvas: Canvas,
+        rect: RectF,
+        fill: Int,
+        stroke: Int,
+        gloss: Boolean = true,
+        anim: BorderAnim = BorderAnim.NONE,
+        phaseOffset: Float = 0f,
+    ) {
+        fillPaint.color = Color.argb(56, Color.red(stroke), Color.green(stroke), Color.blue(stroke))
         canvas.drawRoundRect(RectF(rect.left + dp(4f), rect.top + dp(6f), rect.right + dp(4f), rect.bottom + dp(6f)), dp(18f), dp(18f), fillPaint)
         fillPaint.color = fill
         canvas.drawRoundRect(rect, dp(18f), dp(18f), fillPaint)
+        val borderRect = rect.insetCopy(dp(1.2f), dp(1.2f))
+        val borderRadius = dp(16.8f)
+        strokePaint.color = Color.argb(72, Color.red(stroke), Color.green(stroke), Color.blue(stroke))
+        strokePaint.strokeWidth = dp(3.1f)
+        canvas.drawRoundRect(borderRect, borderRadius, borderRadius, strokePaint)
         strokePaint.color = stroke
-        strokePaint.strokeWidth = dp(1.6f)
-        canvas.drawRoundRect(rect, dp(18f), dp(18f), strokePaint)
+        strokePaint.strokeWidth = dp(1.2f)
+        canvas.drawRoundRect(borderRect, borderRadius, borderRadius, strokePaint)
         if (gloss) {
-            fillPaint.shader = LinearGradient(rect.left, rect.top, rect.left, rect.bottom, Color.argb(55, 255, 255, 255), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+            fillPaint.shader = LinearGradient(rect.left, rect.top, rect.left, rect.bottom, Color.argb(52, 255, 255, 255), Color.argb(0, 255, 255, 255), Shader.TileMode.CLAMP)
             canvas.drawRoundRect(RectF(rect.left + dp(2f), rect.top + dp(2f), rect.right - dp(2f), rect.centerY()), dp(18f), dp(18f), fillPaint)
             fillPaint.shader = null
+        }
+        drawAnimatedPanelBorder(canvas, borderRect, stroke, anim, phaseOffset)
+    }
+
+    private fun drawAnimatedPanelBorder(
+        canvas: Canvas,
+        rect: RectF,
+        color: Int,
+        anim: BorderAnim,
+        phaseOffset: Float,
+    ) {
+        if (anim == BorderAnim.NONE) return
+
+        val radius = dp(16.8f)
+        when (anim) {
+            BorderAnim.PULSE -> {
+                val glow = pulse(0.10f, 1f, phaseOffset)
+                strokePaint.shader = null
+                strokePaint.color = withAlpha(color, (54f + 92f * glow).toInt())
+                strokePaint.strokeWidth = dp(2.1f + glow * 1.0f)
+                canvas.drawRoundRect(rect, radius, radius, strokePaint)
+            }
+
+            BorderAnim.STRIP_HORIZONTAL -> {
+                val travel = ((pulsePhase + phaseOffset) % 1f)
+                val centerX = rect.left - rect.width() * 0.45f + rect.width() * 1.9f * travel
+                strokePaint.shader = LinearGradient(
+                    centerX - rect.width() * 0.36f,
+                    rect.top,
+                    centerX + rect.width() * 0.36f,
+                    rect.bottom,
+                    intArrayOf(Color.TRANSPARENT, withAlpha(color, 224), Color.TRANSPARENT),
+                    floatArrayOf(0f, 0.5f, 1f),
+                    Shader.TileMode.CLAMP,
+                )
+                strokePaint.strokeWidth = dp(2.6f)
+                canvas.drawRoundRect(rect, radius, radius, strokePaint)
+                strokePaint.shader = null
+            }
+
+            BorderAnim.STRIP_VERTICAL -> {
+                val travel = ((pulsePhase + phaseOffset) % 1f)
+                val centerY = rect.top - rect.height() * 0.45f + rect.height() * 1.9f * travel
+                strokePaint.shader = LinearGradient(
+                    rect.left,
+                    centerY - rect.height() * 0.30f,
+                    rect.right,
+                    centerY + rect.height() * 0.30f,
+                    intArrayOf(Color.TRANSPARENT, withAlpha(color, 224), Color.TRANSPARENT),
+                    floatArrayOf(0f, 0.5f, 1f),
+                    Shader.TileMode.CLAMP,
+                )
+                strokePaint.strokeWidth = dp(2.6f)
+                canvas.drawRoundRect(rect, radius, radius, strokePaint)
+                strokePaint.shader = null
+            }
+
+            BorderAnim.NONE -> Unit
         }
     }
 
@@ -1230,11 +1558,53 @@ class ArcadeScratchGameView @JvmOverloads constructor(
 
     private fun text(resId: Int, vararg args: Any): String = resources.getString(resId, *args)
 
+    private fun drawFlowGradientText(
+        canvas: Canvas,
+        text: String,
+        x: Float,
+        baseline: Float,
+        size: Float,
+        bold: Boolean,
+    ) {
+        textPaint.textSize = size
+        textPaint.typeface = Typeface.create("sans-serif-condensed", if (bold) Typeface.BOLD else Typeface.NORMAL)
+        val textWidth = textPaint.measureText(text)
+        val textHeight = textPaint.descent() - textPaint.ascent()
+        val top = baseline + textPaint.ascent()
+        val repeatWidth = max(textWidth * 1.8f, dp(118f))
+        val gradient = LinearGradient(
+            x,
+            top,
+            x + repeatWidth * 0.92f,
+            top + textHeight * 1.08f,
+            intArrayOf(neonPink, neonOrange, neonAmber, neonLime, neonCyan, neonBlue, neonPurple, neonPink),
+            floatArrayOf(0f, 0.14f, 0.28f, 0.44f, 0.62f, 0.78f, 0.92f, 1f),
+            Shader.TileMode.REPEAT,
+        )
+        val elapsed = SystemClock.uptimeMillis() % titleFlowDurationMs
+        val travel = elapsed.toFloat() / titleFlowDurationMs.toFloat()
+        val matrix = Matrix().apply {
+            setTranslate(-repeatWidth + repeatWidth * travel, 0f)
+        }
+        gradient.setLocalMatrix(matrix)
+        textPaint.shader = gradient
+        textPaint.setShadowLayer(dp(5f), 0f, 0f, Color.argb(118, 255, 255, 255))
+        canvas.drawText(text, x, baseline, textPaint)
+        textPaint.shader = null
+        textPaint.clearShadowLayer()
+    }
+
+    private fun measureTextWidth(text: String, size: Float, bold: Boolean): Float {
+        textPaint.textSize = size
+        textPaint.typeface = Typeface.create("sans-serif-condensed", if (bold) Typeface.BOLD else Typeface.NORMAL)
+        return textPaint.measureText(text)
+    }
+
     private fun drawText(canvas: Canvas, text: String, x: Float, y: Float, size: Float, color: Int, bold: Boolean) {
         textPaint.textSize = size
         textPaint.color = color
         textPaint.typeface = Typeface.create("sans-serif-condensed", if (bold) Typeface.BOLD else Typeface.NORMAL)
-        textPaint.setShadowLayer(dp(2f), dp(1f), dp(1f), Color.argb(140, 0, 0, 0))
+        textPaint.setShadowLayer(dp(5f), 0f, 0f, Color.argb(120, Color.red(color), Color.green(color), Color.blue(color)))
         canvas.drawText(text, x, y, textPaint)
         textPaint.clearShadowLayer()
     }
@@ -1300,7 +1670,7 @@ class ArcadeScratchGameView @JvmOverloads constructor(
         val progress = if (maxScroll == 0f) 0f else offset / maxScroll
         val thumbTop = track.top + travel * progress
         val thumb = RectF(track.left, thumbTop, track.right, thumbTop + thumbHeight)
-        fillPaint.color = Color.argb(190, 123, 209, 239)
+        fillPaint.color = neonCyan
         canvas.drawRoundRect(thumb, dp(3f), dp(3f), fillPaint)
     }
 
@@ -1308,7 +1678,7 @@ class ArcadeScratchGameView @JvmOverloads constructor(
         textPaint.textSize = size
         textPaint.color = color
         textPaint.typeface = Typeface.create("sans-serif-condensed", if (bold) Typeface.BOLD else Typeface.NORMAL)
-        textPaint.setShadowLayer(dp(2f), dp(1f), dp(1f), Color.argb(140, 0, 0, 0))
+        textPaint.setShadowLayer(dp(5f), 0f, 0f, Color.argb(120, Color.red(color), Color.green(color), Color.blue(color)))
     }
 
     private fun breakIntoLines(text: String, maxWidth: Float, maxLines: Int): List<String> {
@@ -1360,7 +1730,7 @@ class ArcadeScratchGameView @JvmOverloads constructor(
     }
 
     private fun drawMiniIcon(canvas: Canvas, cx: Float, cy: Float, color: Int, accent: Int, unlocked: Boolean) {
-        fillPaint.color = if (unlocked) color else Color.rgb(38, 42, 50)
+        fillPaint.color = if (unlocked) darken(color, 0.8f) else Color.rgb(22, 26, 40)
         canvas.drawRoundRect(RectF(cx - dp(18f), cy - dp(16f), cx + dp(18f), cy + dp(16f)), dp(6f), dp(6f), fillPaint)
         if (unlocked) {
             drawStar(canvas, cx, cy, dp(10f), accent)
@@ -1375,7 +1745,7 @@ class ArcadeScratchGameView @JvmOverloads constructor(
         when (index) {
             0 -> {
                 val r = dp(6.8f)
-                fillPaint.color = Color.rgb(74, 198, 67)
+                fillPaint.color = neonLime
                 canvas.drawCircle(cx - dp(5.4f), cy - dp(5.4f), r, fillPaint)
                 canvas.drawCircle(cx + dp(5.4f), cy - dp(5.4f), r, fillPaint)
                 canvas.drawCircle(cx - dp(5.4f), cy + dp(5.4f), r, fillPaint)
@@ -1383,16 +1753,16 @@ class ArcadeScratchGameView @JvmOverloads constructor(
             }
 
             1 -> {
-                strokePaint.color = Color.WHITE
+                strokePaint.color = neonCyan
                 strokePaint.strokeWidth = dp(2.2f)
                 canvas.drawRect(cx - dp(11f), cy - dp(11f), cx + dp(11f), cy + dp(11f), strokePaint)
-                drawText(canvas, "R", cx - dp(4.2f), cy + dp(5.2f), sp(10.5f), Color.WHITE, true)
+                drawText(canvas, "R", cx - dp(4.2f), cy + dp(5.2f), sp(10.5f), neonCyan, true)
             }
 
             else -> {
-                fillPaint.color = Color.rgb(228, 118, 44)
+                fillPaint.color = neonPink
                 canvas.drawCircle(cx, cy, dp(11.5f), fillPaint)
-                drawText(canvas, "C", cx - dp(4.2f), cy + dp(5.2f), sp(10.5f), Color.rgb(42, 34, 24), true)
+                drawText(canvas, "C", cx - dp(4.2f), cy + dp(5.2f), sp(10.5f), Color.WHITE, true)
             }
         }
     }
@@ -1439,7 +1809,7 @@ class ArcadeScratchGameView @JvmOverloads constructor(
 
             else -> {
                 canvas.drawCircle(cx, cy, radius, fillPaint)
-                drawText(canvas, symbol.label, cx - radius * 0.35f, cy + radius * 0.34f, radius * 1.08f, Color.rgb(34, 35, 38), true)
+                drawText(canvas, symbol.label, cx - radius * 0.35f, cy + radius * 0.34f, radius * 1.08f, Color.WHITE, true)
             }
         }
     }
@@ -1502,6 +1872,28 @@ class ArcadeScratchGameView @JvmOverloads constructor(
     private fun formatMoney(value: Int): String = "%,d".format(value).replace(",", " ")
 
     private fun formatPercent(value: Float): Int = value.roundToInt()
+
+    private fun updatePulsePhase() {
+        if (pulseStartTimeMs == 0L) {
+            pulseStartTimeMs = SystemClock.uptimeMillis()
+        }
+        val elapsed = SystemClock.uptimeMillis() - pulseStartTimeMs
+        pulsePhase = ((elapsed % pulseDurationMs).toFloat() / pulseDurationMs.toFloat()).coerceIn(0f, 1f)
+    }
+
+    private fun pulse(minValue: Float, maxValue: Float, offset: Float = 0f): Float {
+        val wave = ((sin((pulsePhase + offset) * Math.PI * 2.0) + 1.0) * 0.5).toFloat()
+        return minValue + (maxValue - minValue) * wave
+    }
+
+    private fun withAlpha(color: Int, alpha: Int): Int {
+        return Color.argb(
+            alpha.coerceIn(0, 255),
+            Color.red(color),
+            Color.green(color),
+            Color.blue(color),
+        )
+    }
 
     private fun darken(color: Int, factor: Float): Int {
         return Color.rgb(
