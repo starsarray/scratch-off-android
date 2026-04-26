@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="game_hud_title">刮！</string>
+    <string name="game_level_format">%1$d级</string>
+    <string name="game_cash_format">现金 %1$s</string>
+    <string name="game_tab_album">卡册</string>
+    <string name="game_tab_rules">说明</string>
+    <string name="game_ticket_header">月面奖券</string>
+    <string name="game_bonus_slot">奖励位</string>
+    <string name="game_cost_format">消耗 S%1$s</string>
+    <string name="game_action_next">下一张</string>
+    <string name="game_action_settle">立即结算</string>
+    <string name="game_action_continue">继续刮卡</string>
+    <string name="game_card_level_format">卡片等级 %1$d</string>
+    <string name="game_exp_format">经验 %1$d / %2$d</string>
+    <string name="game_symbol_header">图案</string>
+    <string name="game_odds_header">概率</string>
+    <string name="game_amount_header">金额</string>
+    <string name="game_upgrade_title">能力提升</string>
+    <string name="game_upgrade_cost_format">花费 S%1$s</string>
+    <string name="game_need_total_wealth">需要总财富 %1$s</string>
+    <string name="game_continue_to_threshold">继续刮开，达到 %1$s%% 自动结算</string>
+    <string name="game_not_enough_cash_ticket">余额不足，无法购买这张卡</string>
+    <string name="game_not_enough_cash_upgrade">余额不足，无法升级</string>
+    <string name="game_scratch_auto_settle">刮开奖区后自动结算</string>
+    <string name="game_result_win">中奖 +S%1$s  %2$s</string>
+    <string name="game_result_win_bonus">中奖 +S%1$s  %2$s  奖励位 x2</string>
+    <string name="game_result_no_win">未中奖，再试一张</string>
+    <string name="game_scratch_here">刮这里</string>
+
+    <string name="ticket_daily_jobs_title">日常零活</string>
+    <string name="ticket_daily_jobs_subtitle">3格横排</string>
+    <string name="ticket_daily_jobs_rule">刮出3个相同符号即可获胜</string>
+
+    <string name="ticket_double_match_title">双倍成对</string>
+    <string name="ticket_double_match_subtitle">2x2配对</string>
+    <string name="ticket_double_match_rule">任意一行出现一对相同符号即可获胜</string>
+
+    <string name="ticket_mini_line_title">迷你连线</string>
+    <string name="ticket_mini_line_subtitle">5格连线</string>
+    <string name="ticket_mini_line_rule">任意连续3格相同即可获胜</string>
+
+    <string name="ticket_orchard_title">果园丰收</string>
+    <string name="ticket_orchard_subtitle">6格果园</string>
+    <string name="ticket_orchard_rule">6格内任意符号出现3个及以上即可获胜</string>
+
+    <string name="ticket_quick_bonus_title">极速翻倍</string>
+    <string name="ticket_quick_bonus_subtitle">4格+奖励位</string>
+    <string name="ticket_quick_bonus_rule">主区任意3个相同即中奖，奖励位有机会翻倍</string>
+
+    <string name="upgrade_luck_title">运气</string>
+    <string name="upgrade_luck_effect">提高所有卡的中奖率与高奖概率</string>
+    <string name="upgrade_range_title">范围</string>
+    <string name="upgrade_range_effect">扩大刮开半径，减少补刮次数</string>
+    <string name="upgrade_coin_title">刮卡范围</string>
+    <string name="upgrade_coin_effect">降低需要的刮卡范围</string>
+</resources>

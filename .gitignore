@@ -1,0 +1,14 @@
+.gradle/
+.idea/
+.kotlin/
+build/
+app/build/
+local.properties
+*.iml
+
+emulator_out.txt
+emulator_err.txt
+view.xml
+
+decompiled/
+tools/

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">刮！</string>
+    <string name="title">刮！</string>
+    <string name="subtitle">核心是先把银色涂层画到离屏位图上，再用手势一点点把透明区域“擦”出来。</string>
+    <string name="scratch_hint">刮开看看</string>
+    <string name="prize_tag">LUCKY DRAW</string>
+    <string name="prize_amount">¥88.88</string>
+    <string name="prize_message">慢慢刮开，就能看到下面的中奖内容。</string>
+    <string name="progress_default">开始刮吧，当前已揭开 0%</string>
+    <string name="progress_format">当前已揭开 %1$d%%</string>
+    <string name="progress_completed">已达到阈值，整张奖券已自动揭开</string>
+    <string name="reset_button">重新来一张</string>
+</resources>
